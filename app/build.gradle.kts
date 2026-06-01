@@ -5,10 +5,10 @@ plugins {
 }
 
 android {
-    namespace = "com.example.appsearcher"
+    namespace = "net.jj1uzh.appsearcher"
     compileSdk = 36
     defaultConfig {
-        applicationId = "com.example.appsearcher"
+        applicationId = "net.jj1uzh.appsearcher"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
