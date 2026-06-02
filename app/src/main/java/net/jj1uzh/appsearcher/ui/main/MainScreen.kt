@@ -24,6 +24,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import net.jj1uzh.appsearcher.AppInfo
 import net.jj1uzh.appsearcher.AppSearchUiState
 import net.jj1uzh.appsearcher.AppSearchViewModel
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
+
+@OptIn(ExperimentalMaterial3Api::class)
 
 @Composable
 fun MainScreen(
@@ -40,15 +44,25 @@ fun MainScreen(
     }
 
     Column(modifier = modifier.fillMaxSize()) {
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = viewModel::onQueryChange,
+        SearchBar(
+            inputField = {
+                SearchBarDefaults.InputField(
+                    query = searchQuery,
+                    onQueryChange = viewModel::onQueryChange,
+                    onSearch = {},
+                    expanded = false,
+                    onExpandedChange = {},
+                    placeholder = { Text("Search apps...") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    modifier = Modifier.focusRequester(focusRequester)
+                )
+            },
+            expanded = false,
+            onExpandedChange = {},
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 16.dp)
-                .focusRequester(focusRequester),
-            placeholder = { Text("Search apps...") },
-            singleLine = true
+                .padding(bottom = 16.dp, start = 16.dp, end = 16.dp),
+            content = {}
         )
 
         when (val state = uiState) {
