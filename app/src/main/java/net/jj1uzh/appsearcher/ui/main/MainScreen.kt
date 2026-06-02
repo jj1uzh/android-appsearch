@@ -54,7 +54,25 @@ fun MainScreen(
         focusRequester.requestFocus()
     }
 
-    Column(modifier = modifier.fillMaxSize()) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .clickable(
+                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                indication = null
+            ) { (context as? android.app.Activity)?.finish() }
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp)
+                .systemBarsPadding(),
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp,
+            shadowElevation = 12.dp
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
         SearchBar(
             inputField = {
                 SearchBarDefaults.InputField(
@@ -137,6 +155,8 @@ fun MainScreen(
                         AppItem(app = app, onClick = { launchApp(app) }, isTopApp = app == topApp)
                     }
                 }
+            }
+        }
             }
         }
     }

@@ -17,7 +17,7 @@ class MainActivity : ComponentActivity() {
 
     enableEdgeToEdge()
     setContent {
-      AppSearcherTheme { Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background.copy(alpha = 0.85f)) { MainNavigation() } }
+      AppSearcherTheme { Surface(modifier = Modifier.fillMaxSize(), color = Color.Transparent) { MainNavigation() } }
     }
   }
 }
