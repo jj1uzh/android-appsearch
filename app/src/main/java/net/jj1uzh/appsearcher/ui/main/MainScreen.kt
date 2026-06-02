@@ -25,10 +25,14 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import net.jj1uzh.appsearcher.AppInfo
 import net.jj1uzh.appsearcher.AppSearchUiState
 import net.jj1uzh.appsearcher.AppSearchViewModel
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.text.input.ImeAction
+
+@OptIn(ExperimentalMaterial3Api::class)
 
 @Composable
 fun MainScreen(
@@ -51,37 +55,44 @@ fun MainScreen(
     }
 
     Column(modifier = modifier.fillMaxSize()) {
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = viewModel::onQueryChange,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp)
-                .focusRequester(focusRequester)
-                .onKeyEvent { keyEvent ->
-                    if (keyEvent.type == KeyEventType.KeyUp && keyEvent.key == Key.Enter) {
+        SearchBar(
+            inputField = {
+                SearchBarDefaults.InputField(
+                    query = searchQuery,
+                    onQueryChange = viewModel::onQueryChange,
+                    onSearch = {
                         val state = uiState
                         if (state is AppSearchUiState.Success) {
                             val topApp = state.recentApps.firstOrNull() ?: state.apps.firstOrNull()
                             topApp?.let(launchApp)
                         }
-                        true
-                    } else {
-                        false
-                    }
-                },
-            placeholder = { Text("Search apps...") },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(
-                onSearch = {
-                    val state = uiState
-                    if (state is AppSearchUiState.Success) {
-                        val topApp = state.recentApps.firstOrNull() ?: state.apps.firstOrNull()
-                        topApp?.let(launchApp)
-                    }
-                }
-            )
+                    },
+                    expanded = false,
+                    onExpandedChange = {},
+                    placeholder = { Text("Search apps...") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    modifier = Modifier
+                        .focusRequester(focusRequester)
+                        .onKeyEvent { keyEvent ->
+                            if (keyEvent.type == KeyEventType.KeyUp && keyEvent.key == Key.Enter) {
+                                val state = uiState
+                                if (state is AppSearchUiState.Success) {
+                                    val topApp = state.recentApps.firstOrNull() ?: state.apps.firstOrNull()
+                                    topApp?.let(launchApp)
+                                }
+                                true
+                            } else {
+                                false
+                            }
+                        }
+                )
+            },
+            expanded = false,
+            onExpandedChange = {},
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp, start = 8.dp, end = 8.dp),
+            content = {}
         )
 
         when (val state = uiState) {
@@ -95,6 +106,7 @@ fun MainScreen(
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(4),
                     modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(horizontal = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
