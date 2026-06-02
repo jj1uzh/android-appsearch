@@ -47,9 +47,12 @@ class SearchNormalizer {
         // 4. Hiragana/Katakana to Romaji (Latin)
         val romaji = toLatin.transliterate(hiragana)
         keys.add(romaji)
+        keys.add(normalizeRomaji(romaji))
         
         // Also add the romaji version of the halfWidth just in case
-        keys.add(toLatin.transliterate(halfWidth))
+        val hwRomaji = toLatin.transliterate(halfWidth)
+        keys.add(hwRomaji)
+        keys.add(normalizeRomaji(hwRomaji))
         
         return keys.filter { it.isNotBlank() }.toList()
     }
@@ -62,6 +65,37 @@ class SearchNormalizer {
         var q = query.trim()
         q = fullToHalf.transliterate(q)
         q = toLatin.transliterate(q)
-        return q.lowercase()
+        q = q.lowercase()
+        return normalizeQueryRomaji(q)
+    }
+
+    private fun normalizeRomaji(text: String): String {
+        var s = text
+        s = s.replace("shi", "si")
+        s = s.replace("sha", "sya")
+        s = s.replace("shu", "syu")
+        s = s.replace("sho", "syo")
+        s = s.replace("chi", "ti")
+        s = s.replace("cha", "tya")
+        s = s.replace("chu", "tyu")
+        s = s.replace("cho", "tyo")
+        s = s.replace("tsu", "tu")
+        s = s.replace("fu", "hu")
+        s = s.replace("ji", "zi")
+        s = s.replace("ja", "zya")
+        s = s.replace("ju", "zyu")
+        s = s.replace("jo", "zyo")
+        return s
+    }
+
+    private fun normalizeQueryRomaji(query: String): String {
+        var s = normalizeRomaji(query)
+        if (s.endsWith("sh")) s = s.substring(0, s.length - 2) + "s"
+        if (s.endsWith("ch")) s = s.substring(0, s.length - 2) + "t"
+        if (s.endsWith("ts")) s = s.substring(0, s.length - 2) + "t"
+        if (s.endsWith("j")) s = s.substring(0, s.length - 1) + "z"
+        if (s.endsWith("f")) s = s.substring(0, s.length - 1) + "h"
+        if (s.endsWith("c")) s = s.substring(0, s.length - 1) + "t"
+        return s
     }
 }
