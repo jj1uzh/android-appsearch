@@ -26,7 +26,7 @@ class RecentAppsRepository(private val context: Context) {
             list.remove(packageName)
             list.add(0, packageName)
             
-            val trimmed = list.take(10)
+            val trimmed = list.take(4)
             preferences[RECENT_APPS_KEY] = trimmed.joinToString(",")
         }
     }
