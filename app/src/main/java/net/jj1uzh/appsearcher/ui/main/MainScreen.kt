@@ -2,6 +2,7 @@ package net.jj1uzh.appsearcher.ui.main
 
 import android.content.Intent
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -104,29 +105,71 @@ fun MainScreen(
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun AppItem(app: AppInfo, onClick: () -> Unit) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .clickable(onClick = onClick)
-            .padding(4.dp)
-    ) {
-        val bitmap = remember(app.icon) {
-            app.icon.toBitmap().asImageBitmap()
+    var showMenu by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    Box(contentAlignment = Alignment.Center) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .combinedClickable(
+                    onClick = onClick,
+                    onLongClick = { showMenu = true }
+                )
+                .padding(4.dp)
+        ) {
+            val bitmap = remember(app.icon) {
+                app.icon.toBitmap().asImageBitmap()
+            }
+            Image(
+                bitmap = bitmap,
+                contentDescription = app.name,
+                modifier = Modifier.size(48.dp)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = app.name,
+                style = MaterialTheme.typography.bodySmall,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
-        Image(
-            bitmap = bitmap,
-            contentDescription = app.name,
-            modifier = Modifier.size(48.dp)
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = app.name,
-            style = MaterialTheme.typography.bodySmall,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
+
+        DropdownMenu(
+            expanded = showMenu,
+            onDismissRequest = { showMenu = false }
+        ) {
+            DropdownMenuItem(
+                text = { Text("ホーム画面に追加") },
+                onClick = {
+                    showMenu = false
+                    val shortcutManager = context.getSystemService(android.content.pm.ShortcutManager::class.java)
+                    if (shortcutManager?.isRequestPinShortcutSupported == true) {
+                        val launchIntent = context.packageManager.getLaunchIntentForPackage(app.packageName)
+                        if (launchIntent != null) {
+                            val pinShortcutInfo = android.content.pm.ShortcutInfo.Builder(context, app.packageName)
+                                .setShortLabel(app.name)
+                                .setIntent(launchIntent)
+                                .setIcon(android.graphics.drawable.Icon.createWithBitmap(app.icon.toBitmap()))
+                                .build()
+                            shortcutManager.requestPinShortcut(pinShortcutInfo, null)
+                        }
+                    }
+                }
+            )
+            DropdownMenuItem(
+                text = { Text("アンインストール") },
+                onClick = {
+                    showMenu = false
+                    val intent = Intent(Intent.ACTION_DELETE)
+                    intent.data = android.net.Uri.parse("package:${app.packageName}")
+                    context.startActivity(intent)
+                }
+            )
+        }
     }
 }
