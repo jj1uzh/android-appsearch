@@ -2,6 +2,7 @@ package net.jj1uzh.appsearcher.ui.main
 
 import android.content.Intent
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -90,6 +91,7 @@ fun MainScreen(
                 }
             }
             is AppSearchUiState.Success -> {
+                val topApp = state.recentApps.firstOrNull() ?: state.apps.firstOrNull()
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(4),
                     modifier = Modifier.fillMaxSize(),
@@ -105,7 +107,7 @@ fun MainScreen(
                             )
                         }
                         items(state.recentApps) { app ->
-                            AppItem(app = app, onClick = { launchApp(app) })
+                            AppItem(app = app, onClick = { launchApp(app) }, isTopApp = app == topApp)
                         }
                         item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(4) }) {
                             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
@@ -120,7 +122,7 @@ fun MainScreen(
                     }
 
                     items(state.apps) { app ->
-                        AppItem(app = app, onClick = { launchApp(app) })
+                        AppItem(app = app, onClick = { launchApp(app) }, isTopApp = app == topApp)
                     }
                 }
             }
@@ -129,10 +131,12 @@ fun MainScreen(
 }
 
 @Composable
-fun AppItem(app: AppInfo, onClick: () -> Unit) {
+fun AppItem(app: AppInfo, onClick: () -> Unit, isTopApp: Boolean = false) {
+    val bgColor = if (isTopApp) MaterialTheme.colorScheme.primaryContainer else androidx.compose.ui.graphics.Color.Transparent
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
+            .background(bgColor, shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
             .clickable(onClick = onClick)
             .padding(4.dp)
     ) {
