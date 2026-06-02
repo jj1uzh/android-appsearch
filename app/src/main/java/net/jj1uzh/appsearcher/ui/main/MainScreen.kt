@@ -3,6 +3,7 @@ package net.jj1uzh.appsearcher.ui.main
 import android.content.Intent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -25,6 +26,14 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import net.jj1uzh.appsearcher.AppInfo
 import net.jj1uzh.appsearcher.AppSearchUiState
 import net.jj1uzh.appsearcher.AppSearchViewModel
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.input.key.*
+import androidx.compose.ui.text.input.ImeAction
+
+@OptIn(ExperimentalMaterial3Api::class)
 
 @Composable
 fun MainScreen(
@@ -36,20 +45,55 @@ fun MainScreen(
     val context = LocalContext.current
     val focusRequester = remember { FocusRequester() }
 
+    val launchApp: (AppInfo) -> Unit = { app ->
+        viewModel.onAppLaunched(app.packageName)
+        val intent = context.packageManager.getLaunchIntentForPackage(app.packageName)
+        intent?.let { context.startActivity(it) }
+    }
+
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
     }
 
     Column(modifier = modifier.fillMaxSize()) {
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = viewModel::onQueryChange,
+        SearchBar(
+            inputField = {
+                SearchBarDefaults.InputField(
+                    query = searchQuery,
+                    onQueryChange = viewModel::onQueryChange,
+                    onSearch = {
+                        val state = uiState
+                        if (state is AppSearchUiState.Success) {
+                            val topApp = state.recentApps.firstOrNull() ?: state.apps.firstOrNull()
+                            topApp?.let(launchApp)
+                        }
+                    },
+                    expanded = false,
+                    onExpandedChange = {},
+                    placeholder = { Text("Search apps...") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    modifier = Modifier
+                        .focusRequester(focusRequester)
+                        .onKeyEvent { keyEvent ->
+                            if (keyEvent.type == KeyEventType.KeyUp && keyEvent.key == Key.Enter) {
+                                val state = uiState
+                                if (state is AppSearchUiState.Success) {
+                                    val topApp = state.recentApps.firstOrNull() ?: state.apps.firstOrNull()
+                                    topApp?.let(launchApp)
+                                }
+                                true
+                            } else {
+                                false
+                            }
+                        }
+                )
+            },
+            expanded = false,
+            onExpandedChange = {},
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 16.dp)
-                .focusRequester(focusRequester),
-            placeholder = { Text("Search apps...") },
-            singleLine = true
+                .padding(bottom = 16.dp, start = 8.dp, end = 8.dp),
+            content = {}
         )
 
         when (val state = uiState) {
@@ -59,9 +103,11 @@ fun MainScreen(
                 }
             }
             is AppSearchUiState.Success -> {
+                val topApp = state.recentApps.firstOrNull() ?: state.apps.firstOrNull()
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(4),
                     modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(horizontal = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
@@ -74,11 +120,7 @@ fun MainScreen(
                             )
                         }
                         items(state.recentApps) { app ->
-                            AppItem(app = app, onClick = {
-                                viewModel.onAppLaunched(app.packageName)
-                                val intent = context.packageManager.getLaunchIntentForPackage(app.packageName)
-                                intent?.let { context.startActivity(it) }
-                            })
+                            AppItem(app = app, onClick = { launchApp(app) }, isTopApp = app == topApp)
                         }
                         item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(4) }) {
                             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
@@ -93,11 +135,7 @@ fun MainScreen(
                     }
 
                     items(state.apps) { app ->
-                        AppItem(app = app, onClick = {
-                            viewModel.onAppLaunched(app.packageName)
-                            val intent = context.packageManager.getLaunchIntentForPackage(app.packageName)
-                            intent?.let { context.startActivity(it) }
-                        })
+                        AppItem(app = app, onClick = { launchApp(app) }, isTopApp = app == topApp)
                     }
                 }
             }
@@ -107,14 +145,16 @@ fun MainScreen(
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-fun AppItem(app: AppInfo, onClick: () -> Unit) {
+fun AppItem(app: AppInfo, onClick: () -> Unit, isTopApp: Boolean = false) {
     var showMenu by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val bgColor = if (isTopApp) MaterialTheme.colorScheme.surfaceVariant else androidx.compose.ui.graphics.Color.Transparent
 
     Box(contentAlignment = Alignment.Center) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
+                .background(bgColor, shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
                 .combinedClickable(
                     onClick = onClick,
                     onLongClick = { showMenu = true }

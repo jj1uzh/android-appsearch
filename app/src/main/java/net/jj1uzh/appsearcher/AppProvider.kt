@@ -19,11 +19,13 @@ class AppProvider(private val context: Context) {
             pm.queryIntentActivities(intent, 0)
         }
 
-        return resolveInfoList.map { resolveInfo ->
-            val appName = resolveInfo.loadLabel(pm).toString()
-            val packageName = resolveInfo.activityInfo.packageName
-            val icon = resolveInfo.loadIcon(pm)
-            AppInfo(packageName = packageName, name = appName, icon = icon)
-        }
+        return resolveInfoList
+            .filterNot { it.activityInfo.packageName == context.packageName }
+            .map { resolveInfo ->
+                val appName = resolveInfo.loadLabel(pm).toString()
+                val packageName = resolveInfo.activityInfo.packageName
+                val icon = resolveInfo.loadIcon(pm)
+                AppInfo(packageName = packageName, name = appName, icon = icon)
+            }
     }
 }
