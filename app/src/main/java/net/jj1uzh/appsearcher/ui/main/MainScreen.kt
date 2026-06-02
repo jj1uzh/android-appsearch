@@ -21,6 +21,9 @@ import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import net.jj1uzh.appsearcher.AppInfo
 import net.jj1uzh.appsearcher.AppSearchUiState
 import net.jj1uzh.appsearcher.AppSearchViewModel
@@ -34,9 +37,23 @@ fun MainScreen(
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val focusRequester = remember { FocusRequester() }
+    val lifecycleOwner = LocalLifecycleOwner.current
 
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.onQueryChange("")
+                focusRequester.requestFocus()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
     }
 
     Column(modifier = modifier.fillMaxSize()) {
