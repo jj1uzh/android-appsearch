@@ -132,7 +132,7 @@ fun MainScreen(
             onExpandedChange = {},
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 16.dp, start = 8.dp, end = 8.dp),
+                .padding(bottom = 16.dp, start = 16.dp, end = 16.dp),
             content = {}
         )
 
@@ -154,7 +154,7 @@ fun MainScreen(
                     columns = GridCells.Fixed(4),
                     modifier = Modifier.fillMaxSize(),
                     state = gridState,
-                    contentPadding = PaddingValues(horizontal = 8.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
