@@ -132,7 +132,7 @@ fun MainScreen(
 
 @Composable
 fun AppItem(app: AppInfo, onClick: () -> Unit, isTopApp: Boolean = false) {
-    val bgColor = if (isTopApp) MaterialTheme.colorScheme.primaryContainer else androidx.compose.ui.graphics.Color.Transparent
+    val bgColor = if (isTopApp) MaterialTheme.colorScheme.surfaceVariant else androidx.compose.ui.graphics.Color.Transparent
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
