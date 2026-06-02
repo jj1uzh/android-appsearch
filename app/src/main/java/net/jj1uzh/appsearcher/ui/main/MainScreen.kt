@@ -2,6 +2,7 @@ package net.jj1uzh.appsearcher.ui.main
 
 import android.content.Intent
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -24,6 +25,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import net.jj1uzh.appsearcher.AppInfo
 import net.jj1uzh.appsearcher.AppSearchUiState
 import net.jj1uzh.appsearcher.AppSearchViewModel
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.input.key.*
+import androidx.compose.ui.text.input.ImeAction
 
 @Composable
 fun MainScreen(
@@ -34,6 +39,12 @@ fun MainScreen(
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val focusRequester = remember { FocusRequester() }
+
+    val launchApp: (AppInfo) -> Unit = { app ->
+        viewModel.onAppLaunched(app.packageName)
+        val intent = context.packageManager.getLaunchIntentForPackage(app.packageName)
+        intent?.let { context.startActivity(it) }
+    }
 
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
@@ -46,9 +57,31 @@ fun MainScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 16.dp)
-                .focusRequester(focusRequester),
+                .focusRequester(focusRequester)
+                .onKeyEvent { keyEvent ->
+                    if (keyEvent.type == KeyEventType.KeyUp && keyEvent.key == Key.Enter) {
+                        val state = uiState
+                        if (state is AppSearchUiState.Success) {
+                            val topApp = state.recentApps.firstOrNull() ?: state.apps.firstOrNull()
+                            topApp?.let(launchApp)
+                        }
+                        true
+                    } else {
+                        false
+                    }
+                },
             placeholder = { Text("Search apps...") },
-            singleLine = true
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(
+                onSearch = {
+                    val state = uiState
+                    if (state is AppSearchUiState.Success) {
+                        val topApp = state.recentApps.firstOrNull() ?: state.apps.firstOrNull()
+                        topApp?.let(launchApp)
+                    }
+                }
+            )
         )
 
         when (val state = uiState) {
@@ -58,6 +91,7 @@ fun MainScreen(
                 }
             }
             is AppSearchUiState.Success -> {
+                val topApp = state.recentApps.firstOrNull() ?: state.apps.firstOrNull()
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(4),
                     modifier = Modifier.fillMaxSize(),
@@ -73,11 +107,7 @@ fun MainScreen(
                             )
                         }
                         items(state.recentApps) { app ->
-                            AppItem(app = app, onClick = {
-                                viewModel.onAppLaunched(app.packageName)
-                                val intent = context.packageManager.getLaunchIntentForPackage(app.packageName)
-                                intent?.let { context.startActivity(it) }
-                            })
+                            AppItem(app = app, onClick = { launchApp(app) }, isTopApp = app == topApp)
                         }
                         item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(4) }) {
                             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
@@ -92,11 +122,7 @@ fun MainScreen(
                     }
 
                     items(state.apps) { app ->
-                        AppItem(app = app, onClick = {
-                            viewModel.onAppLaunched(app.packageName)
-                            val intent = context.packageManager.getLaunchIntentForPackage(app.packageName)
-                            intent?.let { context.startActivity(it) }
-                        })
+                        AppItem(app = app, onClick = { launchApp(app) }, isTopApp = app == topApp)
                     }
                 }
             }
@@ -105,10 +131,12 @@ fun MainScreen(
 }
 
 @Composable
-fun AppItem(app: AppInfo, onClick: () -> Unit) {
+fun AppItem(app: AppInfo, onClick: () -> Unit, isTopApp: Boolean = false) {
+    val bgColor = if (isTopApp) MaterialTheme.colorScheme.surfaceVariant else androidx.compose.ui.graphics.Color.Transparent
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
+            .background(bgColor, shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
             .clickable(onClick = onClick)
             .padding(4.dp)
     ) {
