@@ -91,7 +91,7 @@ fun MainScreen(
             onExpandedChange = {},
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 16.dp, start = 16.dp, end = 16.dp),
+                .padding(bottom = 16.dp, start = 8.dp, end = 8.dp),
             content = {}
         )
 
@@ -106,7 +106,7 @@ fun MainScreen(
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(4),
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
