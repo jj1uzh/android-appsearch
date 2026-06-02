@@ -1,6 +1,7 @@
 package net.jj1uzh.appsearcher.ui.main
 
 import android.content.Intent
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -44,6 +45,10 @@ fun MainScreen(
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val focusRequester = remember { FocusRequester() }
+
+    BackHandler {
+        (context as? android.app.Activity)?.finish()
+    }
 
     val launchApp: (AppInfo) -> Unit = { app ->
         viewModel.onAppLaunched(app.packageName)
