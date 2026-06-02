@@ -62,6 +62,9 @@ class AppSearchViewModel(application: Application) : AndroidViewModel(applicatio
             val filteredApps = allApps.filter { app ->
                 app.searchKeys.any { key -> key.contains(normalizedQuery) } ||
                 app.packageName.lowercase().contains(normalizedQuery)
+            }.sortedByDescending { app ->
+                app.searchKeys.any { key -> key.startsWith(normalizedQuery) } ||
+                app.packageName.lowercase().startsWith(normalizedQuery)
             }
             AppSearchUiState.Success(
                 isSearch = true,
