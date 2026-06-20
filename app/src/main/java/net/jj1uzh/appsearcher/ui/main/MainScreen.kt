@@ -36,6 +36,9 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.text.input.ImeAction
+import net.jj1uzh.appsearcher.IconCache
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 
@@ -57,7 +60,10 @@ fun MainScreen(
     val launchApp: (AppInfo) -> Unit = { app ->
         viewModel.onAppLaunched(app.packageName)
         val intent = context.packageManager.getLaunchIntentForPackage(app.packageName)
-        intent?.let { context.startActivity(it) }
+        intent?.let { 
+            context.startActivity(it)
+            (context as? android.app.Activity)?.finish()
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -83,13 +89,15 @@ fun MainScreen(
             .clickable(
                 interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                 indication = null
-            ) { (context as? android.app.Activity)?.finish() }
+            ) { (context as? android.app.Activity)?.finish() },
+        contentAlignment = Alignment.Center
     ) {
         Surface(
             modifier = Modifier
-                .fillMaxSize()
+                .systemBarsPadding()
                 .padding(16.dp)
-                .systemBarsPadding(),
+                .sizeIn(maxWidth = 600.dp, maxHeight = 800.dp)
+                .fillMaxSize(),
             shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 6.dp,
@@ -169,16 +177,6 @@ fun MainScreen(
                         items(state.recentApps) { app ->
                             AppItem(app = app, onClick = { launchApp(app) }, isTopApp = app == topApp)
                         }
-                        item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(4) }) {
-                            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                        }
-                        item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(4) }) {
-                            Text(
-                                text = "All Apps",
-                                style = MaterialTheme.typography.titleMedium,
-                                modifier = Modifier.padding(bottom = 8.dp)
-                            )
-                        }
                     }
 
                     items(state.apps) { app ->
@@ -202,14 +200,33 @@ fun AppItem(app: AppInfo, onClick: () -> Unit, isTopApp: Boolean = false) {
             .clickable(onClick = onClick)
             .padding(4.dp)
     ) {
-        val bitmap = remember(app.icon) {
-            app.icon.toBitmap().asImageBitmap()
+        val context = LocalContext.current
+        var bitmap by remember(app.packageName) { mutableStateOf(IconCache.get(app.packageName)) }
+
+        LaunchedEffect(app.packageName) {
+            if (bitmap == null) {
+                withContext(Dispatchers.IO) {
+                    try {
+                        val drawable = context.packageManager.getApplicationIcon(app.packageName)
+                        val imageBitmap = drawable.toBitmap().asImageBitmap()
+                        IconCache.put(app.packageName, imageBitmap)
+                        bitmap = imageBitmap
+                    } catch (e: Exception) {
+                        // ignore
+                    }
+                }
+            }
         }
-        Image(
-            bitmap = bitmap,
-            contentDescription = app.name,
-            modifier = Modifier.size(48.dp)
-        )
+
+        if (bitmap != null) {
+            Image(
+                bitmap = bitmap!!,
+                contentDescription = app.name,
+                modifier = Modifier.size(48.dp)
+            )
+        } else {
+            Box(modifier = Modifier.size(48.dp).background(androidx.compose.ui.graphics.Color.Gray.copy(alpha = 0.3f), shape = androidx.compose.foundation.shape.CircleShape))
+        }
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = app.name,

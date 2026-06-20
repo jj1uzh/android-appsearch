@@ -27,11 +27,24 @@ class AppSearchViewModel(application: Application) : AndroidViewModel(applicatio
     
     private fun loadApps() {
         viewModelScope.launch(Dispatchers.IO) {
-            val apps = appProvider.getInstalledApps().map { app ->
-                val keys = normalizer.normalize(app.name)
-                app.copy(searchKeys = keys)
+            val cachedApps = appProvider.loadCachedApps()
+            if (cachedApps.isNotEmpty()) {
+                val apps = cachedApps.map { app ->
+                    val keys = normalizer.normalize(app.name)
+                    app.copy(searchKeys = keys)
+                }
+                _allApps.value = apps.sortedBy { it.name.lowercase() }
             }
-            _allApps.value = apps.sortedBy { it.name.lowercase() }
+
+            val freshApps = appProvider.getInstalledApps()
+            if (freshApps != cachedApps) {
+                appProvider.saveCachedApps(freshApps)
+                val apps = freshApps.map { app ->
+                    val keys = normalizer.normalize(app.name)
+                    app.copy(searchKeys = keys)
+                }
+                _allApps.value = apps.sortedBy { it.name.lowercase() }
+            }
         }
     }
     
@@ -55,7 +68,7 @@ class AppSearchViewModel(application: Application) : AndroidViewModel(applicatio
             AppSearchUiState.Success(
                 isSearch = false,
                 recentApps = recentApps,
-                apps = allApps
+                apps = emptyList()
             )
         } else {
             val normalizedQuery = normalizer.normalizeQuery(query)

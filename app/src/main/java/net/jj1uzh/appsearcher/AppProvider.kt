@@ -5,6 +5,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 
+import java.io.File
+
 class AppProvider(private val context: Context) {
     fun getInstalledApps(): List<AppInfo> {
         val pm = context.packageManager
@@ -24,8 +26,32 @@ class AppProvider(private val context: Context) {
             .map { resolveInfo ->
                 val appName = resolveInfo.loadLabel(pm).toString()
                 val packageName = resolveInfo.activityInfo.packageName
-                val icon = resolveInfo.loadIcon(pm)
-                AppInfo(packageName = packageName, name = appName, icon = icon)
+                AppInfo(packageName = packageName, name = appName)
             }
+    }
+
+    fun loadCachedApps(): List<AppInfo> {
+        val file = File(context.cacheDir, "apps_cache.tsv")
+        if (!file.exists()) return emptyList()
+        return try {
+            file.readLines().mapNotNull { line ->
+                val parts = line.split("\t", limit = 2)
+                if (parts.size == 2) {
+                    AppInfo(packageName = parts[0], name = parts[1])
+                } else null
+            }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    fun saveCachedApps(apps: List<AppInfo>) {
+        val file = File(context.cacheDir, "apps_cache.tsv")
+        try {
+            val content = apps.joinToString("\n") { "${it.packageName}\t${it.name}" }
+            file.writeText(content)
+        } catch (e: Exception) {
+            // Ignore
+        }
     }
 }
