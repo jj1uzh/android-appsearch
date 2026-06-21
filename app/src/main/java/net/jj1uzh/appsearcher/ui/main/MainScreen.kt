@@ -53,9 +53,6 @@ fun MainScreen(
     val focusRequester = remember { FocusRequester() }
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    BackHandler {
-        (context as? android.app.Activity)?.finish()
-    }
 
     val launchApp: (AppInfo) -> Unit = { app ->
         viewModel.onAppLaunched(app.packageName)
@@ -187,6 +184,10 @@ fun MainScreen(
         }
             }
         }
+    }
+
+    BackHandler {
+        (context as? android.app.Activity)?.finish()
     }
 }
 
