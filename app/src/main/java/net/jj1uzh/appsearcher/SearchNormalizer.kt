@@ -98,4 +98,16 @@ class SearchNormalizer {
         if (s.endsWith("c")) s = s.substring(0, s.length - 1) + "t"
         return s
     }
+
+    /**
+     * Converts a string to its consonant skeleton to facilitate matching 
+     * English words to their Katakana romaji approximations.
+     * Example: "print" -> "prnt", "purinto" -> "prnt"
+     */
+    fun getConsonants(text: String): String {
+        return text.lowercase()
+            .replace(Regex("[aeiouy\\-]"), "")
+            .replace("c", "k")
+            .replace("l", "r")
+    }
 }

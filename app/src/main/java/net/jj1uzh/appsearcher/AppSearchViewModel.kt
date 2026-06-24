@@ -72,8 +72,14 @@ class AppSearchViewModel(application: Application) : AndroidViewModel(applicatio
             )
         } else {
             val normalizedQuery = normalizer.normalizeQuery(query)
+            val queryConsonants = normalizer.getConsonants(query)
+            val isQueryConsonantsValid = queryConsonants.isNotBlank()
+
             val filteredApps = allApps.filter { app ->
-                app.searchKeys.any { key -> key.contains(normalizedQuery) } ||
+                app.searchKeys.any { key -> 
+                    key.contains(normalizedQuery) ||
+                    (isQueryConsonantsValid && normalizer.getConsonants(key).contains(queryConsonants))
+                } ||
                 app.packageName.lowercase().contains(normalizedQuery)
             }.sortedByDescending { app ->
                 app.searchKeys.any { key -> key.startsWith(normalizedQuery) } ||
