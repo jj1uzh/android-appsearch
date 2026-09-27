@@ -3,14 +3,104 @@ package net.jj1uzh.appsearcher
 import android.icu.text.Transliterator
 import com.atilika.kuromoji.ipadic.Tokenizer
 
-class SearchNormalizer {
-    // Lazy init for tokenizer and transliterators as they can be heavy
+fun interface TransliteratorService {
+    fun transliterate(id: String, text: String): String
+}
+
+private class AndroidTransliteratorService : TransliteratorService {
+    private val map = mutableMapOf<String, Transliterator>()
+    override fun transliterate(id: String, text: String): String {
+        val t = map.getOrPut(id) { Transliterator.getInstance(id) }
+        return t.transliterate(text)
+    }
+}
+
+class SearchNormalizer(
+    private val transliteratorService: TransliteratorService = AndroidTransliteratorService()
+) {
+    // Lazy init for tokenizer as it can be heavy
     private val tokenizer by lazy { Tokenizer() }
-    
-    private val fullToHalf by lazy { Transliterator.getInstance("Fullwidth-Halfwidth") }
-    private val kataToHira by lazy { Transliterator.getInstance("Katakana-Hiragana") }
-    private val toLatin by lazy { Transliterator.getInstance("Any-Latin; Latin-Ascii; Any-Lower") }
-    
+
+    private fun fullToHalf(text: String): String =
+        transliteratorService.transliterate("Fullwidth-Halfwidth", text)
+
+    private fun kataToHira(text: String): String =
+        transliteratorService.transliterate("Katakana-Hiragana", text)
+
+    private fun toLatin(text: String): String =
+        transliteratorService.transliterate("Any-Latin; Latin-Ascii; Any-Lower", text)
+
+    private val romajiMoraRegex = Regex(
+        """(?i)(?:""" +
+        """(?:([b-df-hj-np-tv-z])\1y?|t?ch|s?sh|[b-df-hj-np-tv-z]y|[b-df-hj-np-tv-z])?[aeiou]""" +
+        """|n(?![aeiouy])""" +
+        """|[b-df-hj-np-tv-z]+$""" +
+        """|[^a-z\s]+""" +
+        """)"""
+    )
+
+    /**
+     * Splits a hiragana string into morae (sound units).
+     * Sokuon (っ) is combined with the following kana, and small kana (ゃ, ゅ, ょ, etc.)
+     * are combined with the preceding kana.
+     */
+    fun splitHiraganaToMorae(text: String): List<String> {
+        val result = mutableListOf<String>()
+        var i = 0
+        val smallKana = setOf('ゃ', 'ゅ', 'ょ', 'ゎ', 'ぁ', 'ぃ', 'ぅ', 'ぇ', 'ぉ')
+
+        while (i < text.length) {
+            val c = text[i]
+
+            // Consecutive ASCII alphanumeric
+            if (c in 'a'..'z' || c in 'A'..'Z' || c in '0'..'9') {
+                val start = i
+                while (i < text.length && (text[i] in 'a'..'z' || text[i] in 'A'..'Z' || text[i] in '0'..'9')) {
+                    i++
+                }
+                result.add(text.substring(start, i))
+                continue
+            }
+            if (c.isWhitespace()) {
+                i++
+                continue
+            }
+
+            if (c == 'っ') {
+                if (i + 1 < text.length) {
+                    if (i + 2 < text.length && smallKana.contains(text[i + 2])) {
+                        result.add(text.substring(i, i + 3))
+                        i += 3
+                    } else {
+                        result.add(text.substring(i, i + 2))
+                        i += 2
+                    }
+                    continue
+                }
+            }
+
+            if (i + 1 < text.length && smallKana.contains(text[i + 1])) {
+                result.add(text.substring(i, i + 2))
+                i += 2
+                continue
+            }
+
+            result.add(c.toString())
+            i++
+        }
+        return result
+    }
+
+    /**
+     * Splits a romaji string into morae (sound units) based on syllables.
+     */
+    fun splitRomajiToMorae(text: String): List<String> {
+        return romajiMoraRegex.findAll(text)
+            .map { it.value.lowercase() }
+            .filter { it.isNotBlank() }
+            .toList()
+    }
+
     /**
      * Given an app name (e.g. "設定", "カメラ"), returns a set of normalized
      * strings that can be matched against a user query.
@@ -20,56 +110,199 @@ class SearchNormalizer {
         val original = text.trim()
         keys.add(original)
         keys.add(original.lowercase())
-        
+
         // 1. Full-width to Half-width
-        val halfWidth = fullToHalf.transliterate(original)
+        val halfWidth = fullToHalf(original)
         keys.add(halfWidth)
         keys.add(halfWidth.lowercase())
-        
+
         // 2. Kuromoji Kanji to Kana (Katakana)
         var readingKatakana = ""
         try {
             val tokens = tokenizer.tokenize(original)
-            readingKatakana = tokens.joinToString("") { token -> 
-                // token.reading might be null if it's already kana or alphanumeric, 
-                // in that case we use the surface form
-                token.reading ?: token.surface
+            readingKatakana = tokens.joinToString("") { token ->
+                val r = token.reading
+                if (r == null || r == "*") token.surface else r
             }
         } catch (e: Exception) {
             readingKatakana = original
         }
         keys.add(readingKatakana)
-        
+
         // 3. Katakana to Hiragana
-        val hiragana = kataToHira.transliterate(readingKatakana)
+        val hiragana = kataToHira(readingKatakana)
         keys.add(hiragana)
-        
-        // 4. Hiragana/Katakana to Romaji (Latin)
-        val romaji = toLatin.transliterate(hiragana)
-        keys.add(romaji)
-        keys.add(normalizeRomaji(romaji))
-        
-        // Also add the romaji version of the halfWidth just in case
-        val hwRomaji = toLatin.transliterate(halfWidth)
-        keys.add(hwRomaji)
-        keys.add(normalizeRomaji(hwRomaji))
-        
+
+        // 4. Mora-delimited Romaji (Hepburn & Kunrei)
+        val morae = splitHiraganaToMorae(hiragana)
+        if (morae.isNotEmpty()) {
+            val romajiMorae = morae.map { mora ->
+                toLatin(mora).trim()
+            }.filter { it.isNotBlank() }
+
+            if (romajiMorae.isNotEmpty()) {
+                val hepburn = romajiMorae.joinToString(" ")
+                keys.add("mora:$hepburn")
+
+                val kunrei = romajiMorae.map { normalizeRomaji(it) }.joinToString(" ")
+                keys.add("mora:$kunrei")
+            }
+        }
+
         return keys.filter { it.isNotBlank() }.toList()
     }
-    
+
     /**
      * Normalizes a search query typed by the user.
-     * We typically convert it to lower-case half-width romaji/hiragana to match.
      */
     fun normalizeQuery(query: String): String {
         var q = query.trim()
-        q = fullToHalf.transliterate(q)
-        q = toLatin.transliterate(q)
+        q = fullToHalf(q)
+        q = toLatin(q)
         q = q.lowercase()
         return normalizeQueryRomaji(q)
     }
 
-    private fun normalizeRomaji(text: String): String {
+    /**
+     * Checks if the app matches the query.
+     */
+    fun matches(app: AppInfo, query: String): Boolean {
+        return matches(app.searchKeys, app.packageName, query)
+    }
+
+    /**
+     * Checks if the app is a prefix match for the query.
+     */
+    fun isPrefixMatch(app: AppInfo, query: String): Boolean {
+        return isPrefixMatch(app.searchKeys, app.packageName, query)
+    }
+
+    fun matches(searchKeys: List<String>, packageName: String, query: String): Boolean {
+        val qRaw = query.trim()
+        if (qRaw.isBlank()) return false
+
+        val qHalf = fullToHalf(qRaw).lowercase()
+        val qHira = kataToHira(qHalf).lowercase()
+
+        // 1. Check package name (prefix match on segments, e.g. "settings" in "com.android.settings")
+        val pkgMatches = packageName.lowercase()
+            .split(".", "_", "-")
+            .filter { it.isNotBlank() && it !in setOf("com", "org", "net", "jp", "io", "android") }
+            .any { it.startsWith(qHalf) }
+        if (pkgMatches) return true
+
+        // 2. Check standard search keys (original, kana, etc.)
+        for (key in searchKeys) {
+            if (key.startsWith("mora:")) continue
+            val lowerKey = key.lowercase()
+            if (lowerKey.contains(qRaw.lowercase()) ||
+                lowerKey.contains(qHalf) ||
+                lowerKey.contains(qHira)) {
+                return true
+            }
+        }
+
+        // 3. Check mora-delimited romaji keys
+        val qMorae = splitRomajiToMorae(qHalf)
+        if (qMorae.isNotEmpty()) {
+            val normalizedQMorae = qMorae.map { normalizeQueryRomaji(it) }
+
+            for (key in searchKeys) {
+                if (!key.startsWith("mora:")) continue
+                val keyMoraString = key.removePrefix("mora:")
+                val keyMorae = keyMoraString.split(" ")
+                val normalizedKeyMorae = keyMorae.map { normalizeRomaji(it) }
+                if (isMoraMatch(normalizedKeyMorae, normalizedQMorae)) return true
+                if (isMoraMatch(keyMorae, qMorae)) return true
+            }
+        }
+
+        return false
+    }
+
+    fun isPrefixMatch(searchKeys: List<String>, packageName: String, query: String): Boolean {
+        val qRaw = query.trim()
+        if (qRaw.isBlank()) return false
+
+        val qHalf = fullToHalf(qRaw).lowercase()
+        val qHira = kataToHira(qHalf).lowercase()
+
+        // Check package name
+        val pkgPrefixMatch = packageName.lowercase()
+            .split(".", "_", "-")
+            .filter { it.isNotBlank() && it !in setOf("com", "org", "net", "jp", "io", "android") }
+            .any { it.startsWith(qHalf) }
+        if (pkgPrefixMatch) return true
+
+        // Check standard search keys
+        for (key in searchKeys) {
+            if (key.startsWith("mora:")) continue
+            val lowerKey = key.lowercase()
+            if (lowerKey.startsWith(qRaw.lowercase()) ||
+                lowerKey.startsWith(qHalf) ||
+                lowerKey.startsWith(qHira)) {
+                return true
+            }
+        }
+
+        // Check mora-delimited romaji keys
+        val qMorae = splitRomajiToMorae(qHalf)
+        if (qMorae.isNotEmpty()) {
+            val normalizedQMorae = qMorae.map { normalizeQueryRomaji(it) }
+
+            for (key in searchKeys) {
+                if (!key.startsWith("mora:")) continue
+                val keyMoraString = key.removePrefix("mora:")
+                val keyMorae = keyMoraString.split(" ")
+                val normalizedKeyMorae = keyMorae.map { normalizeRomaji(it) }
+                if (isMoraPrefixMatch(normalizedKeyMorae, normalizedQMorae)) return true
+                if (isMoraPrefixMatch(keyMorae, qMorae)) return true
+            }
+        }
+
+        return false
+    }
+
+    private fun isMoraMatch(keyMorae: List<String>, queryMorae: List<String>): Boolean {
+        if (queryMorae.isEmpty()) return false
+        for (k in keyMorae.indices) {
+            if (k + queryMorae.size > keyMorae.size) break
+            var match = true
+            for (m in queryMorae.indices) {
+                val kMora = keyMorae[k + m]
+                val qMora = queryMorae[m]
+                if (m == queryMorae.size - 1) {
+                    if (!kMora.startsWith(qMora)) {
+                        match = false
+                        break
+                    }
+                } else {
+                    if (kMora != qMora) {
+                        match = false
+                        break
+                    }
+                }
+            }
+            if (match) return true
+        }
+        return false
+    }
+
+    private fun isMoraPrefixMatch(keyMorae: List<String>, queryMorae: List<String>): Boolean {
+        if (queryMorae.isEmpty() || keyMorae.size < queryMorae.size) return false
+        for (m in queryMorae.indices) {
+            val kMora = keyMorae[m]
+            val qMora = queryMorae[m]
+            if (m == queryMorae.size - 1) {
+                if (!kMora.startsWith(qMora)) return false
+            } else {
+                if (kMora != qMora) return false
+            }
+        }
+        return true
+    }
+
+    fun normalizeRomaji(text: String): String {
         var s = text
         s = s.replace("shi", "si")
         s = s.replace("sha", "sya")
@@ -88,7 +321,7 @@ class SearchNormalizer {
         return s
     }
 
-    private fun normalizeQueryRomaji(query: String): String {
+    fun normalizeQueryRomaji(query: String): String {
         var s = normalizeRomaji(query)
         if (s.endsWith("sh")) s = s.substring(0, s.length - 2) + "s"
         if (s.endsWith("ch")) s = s.substring(0, s.length - 2) + "t"
