@@ -71,13 +71,10 @@ class AppSearchViewModel(application: Application) : AndroidViewModel(applicatio
                 apps = emptyList()
             )
         } else {
-            val normalizedQuery = normalizer.normalizeQuery(query)
             val filteredApps = allApps.filter { app ->
-                app.searchKeys.any { key -> key.contains(normalizedQuery) } ||
-                app.packageName.lowercase().contains(normalizedQuery)
+                normalizer.matches(app, query)
             }.sortedByDescending { app ->
-                app.searchKeys.any { key -> key.startsWith(normalizedQuery) } ||
-                app.packageName.lowercase().startsWith(normalizedQuery)
+                normalizer.isPrefixMatch(app, query)
             }
             AppSearchUiState.Success(
                 isSearch = true,
